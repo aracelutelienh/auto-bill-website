@@ -1,14 +1,2 @@
-import { json } from "../_lib.js";
-
-export async function onRequest(context) {
-  const { request, env } = context;
-  const key = new URL(request.url).searchParams.get("key");
-  if (!key || key.length > 500) return json({ error: "Not found" }, 404);
-  const obj = await env.CHAT_FILES.get(key);
-  if (!obj) return json({ error: "Not found" }, 404);
-  const headers = new Headers();
-  obj.writeHttpMetadata(headers);
-  headers.set("Cache-Control", "private, max-age=3600");
-  headers.set("X-Content-Type-Options", "nosniff");
-  return new Response(obj.body, { headers });
-}
+import { json,isAdmin,getImage } from "../_lib.js";
+export async function onRequest(context){const {request,env}=context;if(request.method!=="GET")return json({error:"Method not allowed"},405);const id=new URL(request.url).searchParams.get("id");const sessionId=new URL(request.url).searchParams.get("sessionId");if(!id||id.length>100)return json({error:"Not found"},404);const admin=await isAdmin(request,env);const row=await getImage(env,id,sessionId,admin);if(!row)return json({error:"Not found"},404);return new Response(row.image_blob,{headers:{"Content-Type":row.image_type||"application/octet-stream","Cache-Control":"private, max-age=3600","X-Content-Type-Options":"nosniff"}});}
