@@ -1,14 +1,349 @@
 (() => {
-  const $=s=>document.querySelector(s);let current=null;
-  const fmt=t=>new Date(t).toLocaleString('vi-VN',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
-  const renderMsgs=list=>{$('#messages').innerHTML='';for(const m of list){const b=document.createElement('div');b.className='bubble '+m.sender;if(m.text){const tx=document.createElement('div');tx.className='bubble-text';appendText(tx,m.text);b.appendChild(tx)}if(m.image_url){const im=document.createElement('img');im.src=m.image_url;im.alt='Ảnh đính kèm';im.loading='lazy';b.appendChild(im)}const tm=document.createElement('div');tm.className='time';tm.textContent=fmt(m.created_at);b.appendChild(tm);$('#messages').appendChild(b)}$('#messages').scrollTop=$('#messages').scrollHeight};
-  const urlRe=/((https?:\/\/|www\.)[^\s<]+)/gi; function appendText(el,value){const parts=value.split(urlRe);let buffer='';for(const part of parts){if(!part)continue;if(/^https?:\/\//i.test(part)||/^www\./i.test(part)){if(buffer){el.appendChild(document.createTextNode(buffer));buffer='';}const clean=part.replace(/[),.!?;:]+$/,'');const trailing=part.slice(clean.length);const a=document.createElement('a');a.href=clean.startsWith('www.')?'https://'+clean:clean;a.target='_blank';a.rel='noopener noreferrer';a.textContent=clean;el.appendChild(a);if(trailing)el.appendChild(document.createTextNode(trailing));}else buffer+=part;}if(buffer)el.appendChild(document.createTextNode(buffer));}
-  async function status(){const r=await fetch('/api/admin/status');return (await r.json()).authenticated}
-  async function list(){const r=await fetch('/api/admin/conversations');if(r.status===401){location.reload();return}const d=await r.json();const el=$('#list');el.innerHTML='';for(const c of d.conversations||[]){const item=document.createElement('div');item.className='conv'+(c.id===current?' active':'');item.onclick=()=>open(c.id);item.innerHTML='<span class="conv-name"></span><span class="conv-time"></span>'+(c.admin_unread?'<span class="new-pill"></span>':'');item.querySelector('.conv-name').textContent=c.customer_name||'Khách hàng';item.querySelector('.conv-time').textContent=fmt(c.updated_at);el.appendChild(item)}}
-  async function open(id){current=id;const r=await fetch('/api/admin/conversation?id='+encodeURIComponent(id));const d=await r.json();if(!r.ok)return;$('#chatName').textContent=d.conversation.customer_name||'Khách hàng';$('#chatStatus').textContent='Đang hỗ trợ · Cập nhật '+fmt(d.conversation.updated_at);renderMsgs(d.messages||[]);await list()}
-  $('#loginForm').onsubmit=async e=>{e.preventDefault();$('#loginError').textContent='';const r=await fetch('/api/admin/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({password:$('#password').value})});const d=await r.json();if(!r.ok){$('#loginError').textContent=d.error||'Đăng nhập thất bại.';return}$('#login').hidden=true;$('#app').hidden=false;await list();setInterval(list,2500)};
-  $('#logout').onclick=async()=>{await fetch('/api/admin/logout',{method:'POST'});location.reload()};
-  let pendingImage=null; $('#attach').onclick=()=>$('#file').click(); $('#file').onchange=e=>{pendingImage=e.target.files[0]||null}; $('#text').addEventListener('paste',e=>{const item=[...(e.clipboardData?.items||[])].find(i=>i.type.startsWith('image/'));if(item){e.preventDefault();const blob=item.getAsFile();if(blob)pendingImage=new File([blob],`pasted-image-${Date.now()}.${blob.type.split('/')[1]||'png'}`,{type:blob.type});}}); $('#text').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('#composer').requestSubmit();}});
-  $('#composer').onsubmit=async e=>{e.preventDefault();if(!current)return;const f=pendingImage||$('#file').files[0],t=$('#text').value.trim();if(!t&&!f)return;const fd=new FormData();fd.append('conversationId',current);fd.append('text',t);if(f)fd.append('image',f);const btn=e.submitter;btn.disabled=true;try{const r=await fetch('/api/admin/send',{method:'POST',body:fd});const d=await r.json();if(!r.ok)throw Error(d.error||'Lỗi');renderMsgs(d.messages||[]);$('#text').value='';$('#file').value='';pendingImage=null;await list()}catch(err){alert(err.message)}finally{btn.disabled=false}};
-  status().then(ok=>{if(ok){$('#login').hidden=true;$('#app').hidden=false;list();setInterval(list,2500)}});
+  const $ = s => document.querySelector(s);
+  let current = null;
+  let pendingImage = null;
+
+  const fmt = t =>
+    new Date(t).toLocaleString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+  function appendText(el, value) {
+    const urlRe = /((https?:\/\/|www\.)[^\s<]+)/gi;
+    const parts = value.split(urlRe);
+    let buffer = '';
+
+    for (const part of parts) {
+      if (!part) continue;
+
+      if (/^https?:\/\//i.test(part) || /^www\./i.test(part)) {
+        if (buffer) {
+          el.appendChild(document.createTextNode(buffer));
+          buffer = '';
+        }
+
+        const clean = part.replace(/[),.!?;:]+$/, '');
+        const trailing = part.slice(clean.length);
+
+        const a = document.createElement('a');
+        a.href = clean.startsWith('www.') ? 'https://' + clean : clean;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.textContent = clean;
+
+        el.appendChild(a);
+
+        if (trailing) {
+          el.appendChild(document.createTextNode(trailing));
+        }
+      } else {
+        buffer += part;
+      }
+    }
+
+    if (buffer) {
+      el.appendChild(document.createTextNode(buffer));
+    }
+  }
+
+  function renderMsgs(list) {
+    const box = $('#messages');
+    box.innerHTML = '';
+
+    for (const m of list || []) {
+      const b = document.createElement('div');
+      b.className = 'bubble ' + m.sender;
+
+      if (m.text) {
+        const tx = document.createElement('div');
+        tx.className = 'bubble-text';
+        appendText(tx, m.text);
+        b.appendChild(tx);
+      }
+
+      if (m.image_url) {
+        const im = document.createElement('img');
+        im.src = m.image_url;
+        im.alt = 'Ảnh đính kèm';
+        im.loading = 'lazy';
+        b.appendChild(im);
+      }
+
+      const tm = document.createElement('div');
+      tm.className = 'time';
+      tm.textContent = fmt(m.created_at);
+      b.appendChild(tm);
+
+      box.appendChild(b);
+    }
+
+    box.scrollTop = box.scrollHeight;
+  }
+
+  async function status() {
+    const r = await fetch('/api/admin/status');
+    const d = await r.json();
+    return d.authenticated;
+  }
+
+  async function list() {
+    const r = await fetch('/api/admin/conversations');
+
+    if (r.status === 401) {
+      location.reload();
+      return;
+    }
+
+    const d = await r.json();
+    const el = $('#list');
+    el.innerHTML = '';
+
+    for (const c of d.conversations || []) {
+      const item = document.createElement('div');
+
+      item.className = 'conv' + (c.id === current ? ' active' : '');
+      item.onclick = () => open(c.id);
+
+      item.innerHTML =
+        '<span class="conv-name"></span>' +
+        '<span class="conv-time"></span>' +
+        (c.admin_unread ? '<span class="new-pill"></span>' : '');
+
+      item.querySelector('.conv-name').textContent =
+        c.customer_name || 'Khách hàng';
+
+      item.querySelector('.conv-time').textContent =
+        fmt(c.updated_at);
+
+      el.appendChild(item);
+    }
+  }
+
+  async function open(id) {
+    current = id;
+
+    const r = await fetch(
+      '/api/admin/conversation?id=' +
+      encodeURIComponent(id)
+    );
+
+    const d = await r.json();
+
+    if (!r.ok) return;
+
+    $('#chatName').textContent =
+      d.conversation.customer_name || 'Khách hàng';
+
+    $('#chatStatus').textContent =
+      'Đang hỗ trợ · Cập nhật ' +
+      fmt(d.conversation.updated_at);
+
+    renderMsgs(d.messages || []);
+
+    await list();
+
+    $('#text').focus();
+  }
+
+  $('#loginForm').onsubmit = async e => {
+    e.preventDefault();
+
+    $('#loginError').textContent = '';
+
+    const r = await fetch('/api/admin/login', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        password: $('#password').value
+      })
+    });
+
+    const d = await r.json();
+
+    if (!r.ok) {
+      $('#loginError').textContent =
+        d.error || 'Đăng nhập thất bại.';
+      return;
+    }
+
+    $('#login').hidden = true;
+    $('#app').hidden = false;
+
+    await list();
+
+    setInterval(list, 2500);
+  };
+
+  $('#logout').onclick = async () => {
+    await fetch('/api/admin/logout', {
+      method: 'POST'
+    });
+
+    location.reload();
+  };
+
+  // =========================
+  // CHỌN ẢNH
+  // =========================
+
+  $('#attach').onclick = () => {
+    $('#file').click();
+  };
+
+  $('#file').onchange = e => {
+    pendingImage = e.target.files[0] || null;
+
+    if (pendingImage) {
+      $('#text').focus();
+    }
+  };
+
+  // =========================
+  // DÁN ẢNH CTRL + V
+  // =========================
+
+  $('#text').addEventListener('paste', e => {
+    const items = [...(e.clipboardData?.items || [])];
+
+    const imageItem = items.find(item =>
+      item.type && item.type.startsWith('image/')
+    );
+
+    if (!imageItem) return;
+
+    e.preventDefault();
+
+    const blob = imageItem.getAsFile();
+
+    if (!blob) return;
+
+    const ext =
+      blob.type.split('/')[1] || 'png';
+
+    pendingImage = new File(
+      [blob],
+      `pasted-image-${Date.now()}.${ext}`,
+      {
+        type: blob.type
+      }
+    );
+
+    // Hiển thị trạng thái nhẹ trong ô nhập
+    $('#text').placeholder = 'Ảnh đã được dán · nhấn Enter để gửi';
+
+    $('#text').focus();
+  });
+
+  // =========================
+  // ENTER GỬI
+  // SHIFT + ENTER XUỐNG DÒNG
+  // =========================
+
+  $('#text').addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+
+    if (e.shiftKey) {
+      return;
+    }
+
+    e.preventDefault();
+
+    const submitButton =
+      $('#composer button[type="submit"]');
+
+    if (submitButton) {
+      $('#composer').requestSubmit(submitButton);
+    }
+  });
+
+  // =========================
+  // GỬI TIN NHẮN
+  // =========================
+
+  $('#composer').onsubmit = async e => {
+    e.preventDefault();
+
+    if (!current) return;
+
+    const text = $('#text').value.trim();
+
+    const file =
+      pendingImage ||
+      $('#file').files[0] ||
+      null;
+
+    if (!text && !file) return;
+
+    const fd = new FormData();
+
+    fd.append('conversationId', current);
+    fd.append('text', text);
+
+    if (file) {
+      fd.append('image', file);
+    }
+
+    const btn =
+      $('#composer button[type="submit"]');
+
+    if (btn) {
+      btn.disabled = true;
+    }
+
+    try {
+      const r = await fetch('/api/admin/send', {
+        method: 'POST',
+        body: fd
+      });
+
+      const d = await r.json();
+
+      if (!r.ok) {
+        throw new Error(
+          d.error || 'Không thể gửi tin nhắn.'
+        );
+      }
+
+      renderMsgs(d.messages || []);
+
+      $('#text').value = '';
+      $('#file').value = '';
+      pendingImage = null;
+
+      $('#text').placeholder =
+        'Trả lời khách hàng...';
+
+      await list();
+
+      $('#text').focus();
+
+    } catch (err) {
+      alert(err.message);
+
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+      }
+    }
+  };
+
+  // =========================
+  // KHỞI ĐỘNG
+  // =========================
+
+  status().then(ok => {
+    if (ok) {
+      $('#login').hidden = true;
+      $('#app').hidden = false;
+
+      list();
+
+      setInterval(list, 2500);
+    }
+  });
 })();
