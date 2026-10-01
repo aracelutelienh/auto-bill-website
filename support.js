@@ -66,7 +66,7 @@
   text.addEventListener('paste',imageFromClipboard);
 
   text.addEventListener('keydown',e=>{
-    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('#composer').requestSubmit();}
+    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('#composer').requestSubmit($('#composer button[type=submit]'));}
   });
 
   $('#composer').onsubmit=async e=>{
@@ -74,7 +74,7 @@
     const t=text.value.trim();
     if(!t&&!pendingImage)return;
     const fd=new FormData();fd.append('sessionId',sid);fd.append('customerName',localStorage.getItem('ab_name')||'Khách hàng');fd.append('text',t);if(pendingImage)fd.append('image',pendingImage);
-    const btn=e.submitter;btn.disabled=true;
+    const btn=e.submitter || $('#composer button[type=submit]');btn.disabled=true;
     try{const r=await fetch('/api/send',{method:'POST',body:fd});const d=await r.json();if(!r.ok)throw Error(d.error||'Lỗi');render(d.messages||[]);text.value='';pendingImage=null;text.placeholder='Nhập tin nhắn... · Enter để gửi · Shift+Enter xuống dòng';}
     catch(err){alert(err.message)}finally{btn.disabled=false;text.focus()}
   };
