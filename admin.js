@@ -1,7 +1,9 @@
 (() => {
   const $ = s => document.querySelector(s);
+
   let current = null;
   let pendingImage = null;
+  let polling = false;
 
   const fmt = t =>
     new Date(t).toLocaleString('vi-VN', {
@@ -29,7 +31,9 @@
         const trailing = part.slice(clean.length);
 
         const a = document.createElement('a');
-        a.href = clean.startsWith('www.') ? 'https://' + clean : clean;
+        a.href = clean.startsWith('www.')
+          ? 'https://' + clean
+          : clean;
         a.target = '_blank';
         a.rel = 'noopener noreferrer';
         a.textContent = clean;
@@ -51,6 +55,10 @@
 
   function renderMsgs(list) {
     const box = $('#messages');
+
+    const wasNearBottom =
+      box.scrollHeight - box.scrollTop - box.clientHeight < 100;
+
     box.innerHTML = '';
 
     for (const m of list || []) {
@@ -80,17 +88,24 @@
       box.appendChild(b);
     }
 
-    box.scrollTop = box.scrollHeight;
+    if (wasNearBottom) {
+      box.scrollTop = box.scrollHeight;
+    }
   }
 
   async function status() {
-    const r = await fetch('/api/admin/status');
+    const r = await fetch('/api/admin/status', {
+      cache: 'no-store'
+    });
+
     const d = await r.json();
     return d.authenticated;
   }
 
   async function list() {
-    const r = await fetch('/api/admin/conversations');
+    const r = await fetch('/api/admin/conversations', {
+      cache: 'no-store'
+    });
 
     if (r.status === 401) {
       location.reload();
@@ -99,18 +114,23 @@
 
     const d = await r.json();
     const el = $('#list');
+
     el.innerHTML = '';
 
     for (const c of d.conversations || []) {
       const item = document.createElement('div');
 
-      item.className = 'conv' + (c.id === current ? ' active' : '');
+      item.className =
+        'conv' + (c.id === current ? ' active' : '');
+
       item.onclick = () => open(c.id);
 
       item.innerHTML =
         '<span class="conv-name"></span>' +
         '<span class="conv-time"></span>' +
-        (c.admin_unread ? '<span class="new-pill"></span>' : '');
+        (c.admin_unread
+          ? '<span class="new-pill"></span>'
+          : '');
 
       item.querySelector('.conv-name').textContent =
         c.customer_name || 'Khách hàng';
@@ -125,28 +145,49 @@
   async function open(id) {
     current = id;
 
-    const r = await fetch(
-      '/api/admin/conversation?id=' +
-      encodeURIComponent(id)
-    );
-
-    const d = await r.json();
-
-    if (!r.ok) return;
-
-    $('#chatName').textContent =
-      d.conversation.customer_name || 'Khách hàng';
-
-    $('#chatStatus').textContent =
-      'Đang hỗ trợ · Cập nhật ' +
-      fmt(d.conversation.updated_at);
-
-    renderMsgs(d.messages || []);
-
-    await list();
+    await loadCurrentConversation();
 
     $('#text').focus();
   }
+
+  async function loadCurrentConversation() {
+    if (!current) return;
+
+    try {
+      const r = await fetch(
+        '/api/admin/conversation?id=' +
+        encodeURIComponent(current) +
+        '&_=' +
+        Date.now(),
+        {
+          cache: 'no-store'
+        }
+      );
+
+      if (!r.ok) return;
+
+      const d = await r.json();
+
+      if (!d.conversation) return;
+
+      $('#chatName').textContent =
+        d.conversation.customer_name ||
+        'Khách hàng';
+
+      $('#chatStatus').textContent =
+        'Đang hỗ trợ · Cập nhật ' +
+        fmt(d.conversation.updated_at);
+
+      renderMsgs(d.messages || []);
+
+    } catch (err) {
+      console.error('Không thể cập nhật chat:', err);
+    }
+  }
+
+  // =========================
+  // ĐĂNG NHẬP
+  // =========================
 
   $('#loginForm').onsubmit = async e => {
     e.preventDefault();
@@ -176,7 +217,7 @@
 
     await list();
 
-    setInterval(list, 2500);
+    startPolling();
   };
 
   $('#logout').onclick = async () => {
@@ -196,22 +237,27 @@
   };
 
   $('#file').onchange = e => {
-    pendingImage = e.target.files[0] || null;
+    pendingImage =
+      e.target.files[0] || null;
 
     if (pendingImage) {
       $('#text').focus();
+      $('#text').placeholder =
+        'Ảnh đã chọn · nhấn Enter để gửi';
     }
   };
 
   // =========================
-  // DÁN ẢNH CTRL + V
+  // CTRL + V DÁN ẢNH
   // =========================
 
   $('#text').addEventListener('paste', e => {
-    const items = [...(e.clipboardData?.items || [])];
+    const items =
+      [...(e.clipboardData?.items || [])];
 
     const imageItem = items.find(item =>
-      item.type && item.type.startsWith('image/')
+      item.type &&
+      item.type.startsWith('image/')
     );
 
     if (!imageItem) return;
@@ -233,8 +279,8 @@
       }
     );
 
-    // Hiển thị trạng thái nhẹ trong ô nhập
-    $('#text').placeholder = 'Ảnh đã được dán · nhấn Enter để gửi';
+    $('#text').placeholder =
+      'Ảnh đã dán · nhấn Enter để gửi';
 
     $('#text').focus();
   });
@@ -253,24 +299,18 @@
 
     e.preventDefault();
 
-    const submitButton =
-      $('#composer button[type="submit"]');
-
-    if (submitButton) {
-      $('#composer').requestSubmit(submitButton);
-    }
+    sendMessage();
   });
 
   // =========================
-  // GỬI TIN NHẮN
+  // HÀM GỬI
   // =========================
 
-  $('#composer').onsubmit = async e => {
-    e.preventDefault();
-
+  async function sendMessage() {
     if (!current) return;
 
-    const text = $('#text').value.trim();
+    const text =
+      $('#text').value.trim();
 
     const file =
       pendingImage ||
@@ -281,11 +321,21 @@
 
     const fd = new FormData();
 
-    fd.append('conversationId', current);
-    fd.append('text', text);
+    fd.append(
+      'conversationId',
+      current
+    );
+
+    fd.append(
+      'text',
+      text
+    );
 
     if (file) {
-      fd.append('image', file);
+      fd.append(
+        'image',
+        file
+      );
     }
 
     const btn =
@@ -296,20 +346,27 @@
     }
 
     try {
-      const r = await fetch('/api/admin/send', {
-        method: 'POST',
-        body: fd
-      });
+      const r = await fetch(
+        '/api/admin/send',
+        {
+          method: 'POST',
+          body: fd,
+          cache: 'no-store'
+        }
+      );
 
       const d = await r.json();
 
       if (!r.ok) {
         throw new Error(
-          d.error || 'Không thể gửi tin nhắn.'
+          d.error ||
+          'Không thể gửi tin nhắn.'
         );
       }
 
-      renderMsgs(d.messages || []);
+      renderMsgs(
+        d.messages || []
+      );
 
       $('#text').value = '';
       $('#file').value = '';
@@ -330,7 +387,38 @@
         btn.disabled = false;
       }
     }
+  }
+
+  // Nút Gửi
+  $('#composer').onsubmit = async e => {
+    e.preventDefault();
+    await sendMessage();
   };
+
+  // =========================
+  // TỰ ĐỘNG CẬP NHẬT
+  // =========================
+
+  function startPolling() {
+    if (polling) return;
+
+    polling = true;
+
+    setInterval(async () => {
+      try {
+        await list();
+
+        if (current) {
+          await loadCurrentConversation();
+        }
+      } catch (err) {
+        console.error(
+          'Polling error:',
+          err
+        );
+      }
+    }, 2500);
+  }
 
   // =========================
   // KHỞI ĐỘNG
@@ -342,8 +430,7 @@
       $('#app').hidden = false;
 
       list();
-
-      setInterval(list, 2500);
+      startPolling();
     }
   });
 })();
