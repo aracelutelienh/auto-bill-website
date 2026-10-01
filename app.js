@@ -1,44 +1,43 @@
-(async function(){
+(async function () {
   const cfg = window.AUTO_BILL_CONFIG || {};
 
-  // Lấy cấu hình tải ứng dụng
-  try {
-    const r = await fetch('/api/config', {
-      cache: 'no-store'
-    });
+  // ==========================================
+  // LINK TẢI AUTO BILL
+  // ==========================================
 
-    if (r.ok) {
-      const d = await r.json();
+  const downloadUrl =
+    cfg.downloadUrl ||
+    "https://github.com/aracelutelienh/auto-bill-website/releases/download/v1.0.1/AutoBillPro.Setup.1.0.0.exe";
 
-      if (d.downloadUrl) {
-        cfg.downloadUrl = d.downloadUrl;
-      }
-    }
-  } catch {}
-
-  // Link tải Auto Bill
-  document.querySelectorAll('[data-download]').forEach(a => {
-    a.href = cfg.downloadUrl || '#';
+  document.querySelectorAll("[data-download]").forEach((el) => {
+    el.href = downloadUrl;
+    el.target = "_blank";
+    el.rel = "noopener";
   });
 
-  // Link hỗ trợ
-  document.querySelectorAll('[data-support]').forEach(a => {
-    a.href = cfg.supportPath || '/support';
+  // ==========================================
+  // LINK HỖ TRỢ
+  // ==========================================
+
+  const supportUrl = cfg.supportPath || "/support";
+
+  document.querySelectorAll("[data-support]").forEach((el) => {
+    el.href = supportUrl;
   });
 
-  // ==============================
+  // ==========================================
   // KÝ HIỆU TIN NHẮN CHỜ HỖ TRỢ
-  // ==============================
+  // ==========================================
 
-  const notifyEls = document.querySelectorAll('[data-notify]');
+  const notifyEls = document.querySelectorAll("[data-notify]");
 
   if (!notifyEls.length) return;
 
   try {
     const r = await fetch(
-      '/api/public-status?_=' + Date.now(),
+      "/api/public-status?_=" + Date.now(),
       {
-        cache: 'no-store'
+        cache: "no-store"
       }
     );
 
@@ -46,11 +45,8 @@
 
     const data = await r.json();
 
-    notifyEls.forEach(el => {
-      el.textContent = data.unread
-        ? '💬 •'
-        : '💬';
+    notifyEls.forEach((el) => {
+      el.textContent = data.unread ? "💬 •" : "💬";
     });
-
   } catch {}
 })();
