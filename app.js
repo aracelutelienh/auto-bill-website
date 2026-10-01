@@ -27,35 +27,39 @@
     a.href = cfg.supportPath || '/support';
   });
 
-  // Cập nhật ký hiệu thông báo Hỗ trợ
+  // ==============================
+  // THÔNG BÁO HỖ TRỢ CHO ADMIN
+  // ==============================
+
   const notifyEls = document.querySelectorAll('[data-notify]');
 
   if (!notifyEls.length) return;
 
-  const sid = localStorage.getItem('ab_session');
-
-  if (!sid) return;
-
   try {
-    const r = await fetch(
-      '/api/status?sessionId=' +
-      encodeURIComponent(sid) +
-      '&_=' + Date.now(),
-      {
-        cache: 'no-store'
-      }
-    );
+    const r = await fetch('/api/admin/conversations?_=' + Date.now(), {
+      credentials: 'same-origin',
+      cache: 'no-store'
+    });
 
+    // Chưa đăng nhập Admin → không hiện thông báo
     if (!r.ok) return;
 
-    const d = await r.json();
+    const data = await r.json();
+    const conversations = Array.isArray(data.conversations)
+      ? data.conversations
+      : [];
+
+    // Có ít nhất một cuộc trò chuyện khách chưa được Admin xử lý
+    const hasUnread = conversations.some(c => !!c.admin_unread);
 
     notifyEls.forEach(el => {
-      el.textContent = d.unread
+      el.textContent = hasUnread
         ? '💬 •'
         : '💬';
     });
 
-  } catch {}
+  } catch {
+    // Nếu không lấy được trạng thái thì giữ giao diện mặc định
+  }
 })();
 ```
