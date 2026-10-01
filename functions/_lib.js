@@ -99,5 +99,18 @@ export async function readImage(formField){
   if(!allowed.includes(file.type))throw new Error("Chỉ hỗ trợ JPG, PNG, WEBP hoặc GIF.");
   return file;
 }
+export function validateImage(file) {
+  if (!file || !file.size) return null;
+  if (file.size > MAX_IMAGE_BYTES) {
+    throw new Error("Ảnh sau khi nén phải nhỏ hơn 1.5 MB.");
+  }
 
+  const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+
+  if (!allowed.includes(file.type)) {
+    throw new Error("Chỉ hỗ trợ JPG, PNG, WEBP hoặc GIF.");
+  }
+
+  return file;
+}
 export { COOKIE, MAX_IMAGE_BYTES, MAX_TEXT };
