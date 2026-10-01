@@ -14,7 +14,7 @@ export async function onRequest(context) {
     if (request.method === "GET") {
       await env.DB.prepare("UPDATE conversations SET customer_unread=0 WHERE id=?").bind(conversation.id).run();
     }
-    const messages = await getMessages(env, conversation.id);
+    const messages = await getMessages(env, conversation.id, sessionId);
     return withCors(json({ conversation, messages }), request);
   } catch (e) {
     return withCors(json({ error: e.message || "Server error" }, 400), request);
