@@ -1,4 +1,3 @@
-```javascript
 (async function(){
   const cfg = window.AUTO_BILL_CONFIG || {};
 
@@ -17,18 +16,18 @@
     }
   } catch {}
 
-  // Gắn link tải Auto Bill
+  // Link tải Auto Bill
   document.querySelectorAll('[data-download]').forEach(a => {
     a.href = cfg.downloadUrl || '#';
   });
 
-  // Gắn link trang hỗ trợ
+  // Link hỗ trợ
   document.querySelectorAll('[data-support]').forEach(a => {
     a.href = cfg.supportPath || '/support';
   });
 
   // ==============================
-  // THÔNG BÁO HỖ TRỢ CHO ADMIN
+  // KÝ HIỆU TIN NHẮN CHỜ HỖ TRỢ
   // ==============================
 
   const notifyEls = document.querySelectorAll('[data-notify]');
@@ -36,30 +35,22 @@
   if (!notifyEls.length) return;
 
   try {
-    const r = await fetch('/api/admin/conversations?_=' + Date.now(), {
-      credentials: 'same-origin',
-      cache: 'no-store'
-    });
+    const r = await fetch(
+      '/api/public-status?_=' + Date.now(),
+      {
+        cache: 'no-store'
+      }
+    );
 
-    // Chưa đăng nhập Admin → không hiện thông báo
     if (!r.ok) return;
 
     const data = await r.json();
-    const conversations = Array.isArray(data.conversations)
-      ? data.conversations
-      : [];
-
-    // Có ít nhất một cuộc trò chuyện khách chưa được Admin xử lý
-    const hasUnread = conversations.some(c => !!c.admin_unread);
 
     notifyEls.forEach(el => {
-      el.textContent = hasUnread
+      el.textContent = data.unread
         ? '💬 •'
         : '💬';
     });
 
-  } catch {
-    // Nếu không lấy được trạng thái thì giữ giao diện mặc định
-  }
+  } catch {}
 })();
-```
