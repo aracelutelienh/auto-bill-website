@@ -1,0 +1,23 @@
+name = "auto-bill-support"
+compatibility_date = "2026-10-01"
+pages_build_output_dir = "."
+
+# Create these resources once, then fill in the IDs below.
+# wrangler d1 create auto-bill-chat
+# wrangler r2 bucket create auto-bill-chat-files
+
+[[d1_databases]]
+binding = "DB"
+database_name = "auto-bill-chat"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[[r2_buckets]]
+binding = "CHAT_FILES"
+bucket_name = "auto-bill-chat-files"
+
+[vars]
+# Change these before production deployment.
+SITE_NAME = "Auto Bill"
+ADMIN_PASSWORD = "CHANGE_THIS_ADMIN_PASSWORD"
+# Optional: set to a full GitHub Release .exe URL.
+DOWNLOAD_URL = "https://github.com/YOUR_GITHUB/YOUR_REPO/releases/latest/download/AutoBill.exe"

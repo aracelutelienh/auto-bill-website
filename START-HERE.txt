@@ -1,0 +1,20 @@
+AUTO BILL — START HERE
+
+1. Upload this folder to a GitHub repository.
+2. In Cloudflare Pages, connect that repository and deploy with build output directory: .
+3. Create D1 database: auto-bill-chat.
+4. Run schema.sql in D1 SQL Editor.
+5. Create R2 bucket: auto-bill-chat-files.
+6. Pages Settings -> Functions/Bindings:
+   DB = auto-bill-chat
+   CHAT_FILES = auto-bill-chat-files
+7. Pages Settings -> Environment variables:
+   ADMIN_PASSWORD = your private admin password
+   DOWNLOAD_URL = direct GitHub Release .exe URL
+8. Deploy/redeploy Pages.
+9. Deploy cleanup-worker.js once using cleanup-wrangler.toml so 24h cleanup runs hourly.
+10. Test:
+   /support
+   /admin
+
+Do NOT share ADMIN_PASSWORD or put it into frontend JavaScript.
